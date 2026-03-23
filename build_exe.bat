@@ -15,6 +15,7 @@ echo [3/3] 打包 exe...
 pyinstaller ^
   --noconfirm ^
   --clean ^
+  --console ^
   --name ChinesePaperGenerator ^
   --onedir ^
   --add-data "web_app.py;." ^
@@ -22,7 +23,6 @@ pyinstaller ^
   --collect-all streamlit ^
   --collect-all altair ^
   --collect-all httpx ^
-  --collect-all webview ^
   --hidden-import streamlit ^
   --hidden-import streamlit.web.cli ^
   --hidden-import httpx ^
@@ -40,7 +40,6 @@ pyinstaller ^
   --hidden-import docx ^
   --hidden-import reportlab ^
   --hidden-import PIL ^
-  --hidden-import webview ^
   app_launcher.py
 
 if errorlevel 1 (

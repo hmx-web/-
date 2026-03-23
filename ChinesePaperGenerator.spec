@@ -3,14 +3,12 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('web_app.py', '.'), ('src', 'src')]
 binaries = []
-hiddenimports = ['streamlit', 'streamlit.web.cli', 'httpx', 'httpcore', 'h11', 'anyio', 'certifi', 'idna', 'sniffio', 'openai', 'anthropic', 'pydantic', 'pydantic_core', 'yaml', 'docx', 'reportlab', 'PIL', 'webview']
+hiddenimports = ['streamlit', 'streamlit.web.cli', 'httpx', 'httpcore', 'h11', 'anyio', 'certifi', 'idna', 'sniffio', 'openai', 'anthropic', 'pydantic', 'pydantic_core', 'yaml', 'docx', 'reportlab', 'PIL']
 tmp_ret = collect_all('streamlit')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('altair')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('httpx')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('webview')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 

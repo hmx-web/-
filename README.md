@@ -78,14 +78,7 @@ streamlit run web_app.py
 python -m streamlit run web_app.py
 ```
 
-打包后的 EXE：双击 `dist\ChinesePaperGenerator\ChinesePaperGenerator.exe`。
-
-### 桌面应用窗口（不打开系统浏览器）
-
-默认启动器会使用 **pywebview** 弹出独立窗口嵌入界面，看起来像本地应用，而不是新开 Chrome/Edge 标签页。
-
-- Windows 需已安装 **WebView2 运行时**（Win10/11 通常自带；若缺失可安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)）。
-- 若需改回用系统浏览器调试，可设置环境变量：`PAPER_USE_BROWSER=1` 后再启动 exe。
+打包后的 EXE：双击 `dist\ChinesePaperGenerator\ChinesePaperGenerator.exe`，会自动打开**系统默认浏览器**访问本地页面。
 
 功能：
 - 多智能体生成后可在网页中逐段在线修改
@@ -131,6 +124,12 @@ build_installer.bat
 
 - **原因**：`httpx` 由 `OllamaProvider` 等模块使用，PyInstaller 有时不会自动打进包。
 - **处理**：使用最新 `build_exe.bat`（已包含 `--collect-all httpx`），删除 `build/`、`dist/` 后重新打包。
+
+### EXE 双击后窗口一闪就关
+
+- **常见原因**：Streamlit 在打包环境下启用**文件监视**会拉起子进程，容易导致进程立刻退出。
+- **处理**：请用最新 `app_launcher.py` 重新执行 `build_exe.bat`（已加 `--server.fileWatcherType=none` 与 `multiprocessing.freeze_support()`）。
+- **排查**：在项目根目录双击 `debug_run_exe.bat`，或在命令行运行 exe，便于看到报错；同目录会生成 `launcher_error.log`。
 
 ## 支持的模型
 

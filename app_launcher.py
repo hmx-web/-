@@ -1,18 +1,35 @@
-"""桌面启动器：后台启动 Streamlit，用原生窗口（pywebview）嵌入，无需打开系统浏览器。"""
+"""桌面启动器：在同进程内启动 Streamlit，并自动打开系统浏览器（打包 EXE 推荐方式）。"""
 from __future__ import annotations
 
+import multiprocessing
 import os
 import socket
 import sys
 import threading
 import time
+import traceback
+import webbrowser
 from pathlib import Path
 
-# 设为 1 或 true 则仍用系统浏览器打开（调试用）
-_USE_EXTERNAL_BROWSER = os.environ.get("PAPER_USE_BROWSER", "").lower() in ("1", "true", "yes")
+
+def _exe_dir() -> Path:
+    """EXE 所在目录（用于写日志；与 _MEIPASS 不同）。"""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def _log_error(msg: str) -> None:
+    try:
+        log_path = _exe_dir() / "launcher_error.log"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except OSError:
+        pass
 
 
 def _get_base_dir() -> Path:
+    """打包资源目录（web_app.py、src 等）。"""
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
     return Path(__file__).resolve().parent
@@ -38,8 +55,28 @@ def _wait_port_open(port: int, timeout: float = 90.0) -> bool:
     return False
 
 
-def _run_streamlit(web_app: Path, port: int) -> None:
-    """在子线程中运行 Streamlit（主线程留给桌面窗口）。"""
+def _open_browser_when_ready(url: str, port: int) -> None:
+    if _wait_port_open(port):
+        webbrowser.open(url)
+    else:
+        print("警告：服务未在预期时间内启动，请手动在浏览器打开：", url)
+
+
+def main() -> int:
+    base_dir = _get_base_dir()
+    web_app = base_dir / "web_app.py"
+    if not web_app.exists():
+        print(f"未找到 web_app.py: {web_app}")
+        print(f"资源目录应为: {base_dir}")
+        _log_error(f"缺少 web_app.py, base_dir={base_dir}")
+        return 1
+
+    port = _find_free_port()
+    url = f"http://127.0.0.1:{port}"
+
+    os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
+
+    # 打包 EXE 时务必关闭文件监视器，否则会再起子进程/监视器导致秒退
     sys.argv = [
         "streamlit",
         "run",
@@ -49,101 +86,61 @@ def _run_streamlit(web_app: Path, port: int) -> None:
         "--server.address=127.0.0.1",
         "--browser.gatherUsageStats=false",
         "--global.developmentMode=false",
+        "--server.fileWatcherType=none",
+        "--server.runOnSave=false",
     ]
+
+    threading.Thread(
+        target=_open_browser_when_ready,
+        args=(url, port),
+        daemon=True,
+    ).start()
+
+    print("正在启动中文论文生成器...")
+    print("将自动打开系统浏览器，若未打开请访问：", url)
+    print("关闭本窗口将停止服务。")
+
     try:
         from streamlit.web.cli import main as streamlit_main
 
         streamlit_main()
-    except Exception as e:
-        print("Streamlit 启动失败：", e)
-
-
-def _open_external_browser_when_ready(url: str, port: int) -> None:
-    import webbrowser
-
-    if _wait_port_open(port):
-        webbrowser.open(url)
-    else:
-        print("警告：服务未在预期时间内启动，请手动在浏览器打开：", url)
-
-
-def _open_native_window(url: str) -> None:
-    """Windows 下使用 Edge WebView2 内嵌页面，外观类似独立应用。"""
-    import webview
-
-    webview.create_window(
-        "中文论文生成器",
-        url,
-        width=1280,
-        height=840,
-        resizable=True,
-        text_select=True,
-    )
-    webview.start(debug=False)
-
-
-def main() -> int:
-    base_dir = _get_base_dir()
-    web_app = base_dir / "web_app.py"
-    if not web_app.exists():
-        print(f"未找到 web_app.py: {web_app}")
-        input("按回车退出...")
-        return 1
-
-    port = _find_free_port()
-    url = f"http://127.0.0.1:{port}"
-
-    os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
-
-    # 后台线程启动 Streamlit
-    st_thread = threading.Thread(
-        target=_run_streamlit,
-        args=(web_app, port),
-        daemon=True,
-        name="streamlit-server",
-    )
-    st_thread.start()
-
-    print("正在启动中文论文生成器...")
-    if not _wait_port_open(port):
-        print("错误：本地服务未启动成功，请查看上方报错。")
-        input("按回车退出...")
-        return 1
-
-    try:
-        if _USE_EXTERNAL_BROWSER:
-            print("已启用外部浏览器模式：", url)
-            import webbrowser
-
-            webbrowser.open(url)
-            # 阻塞直到用户 Ctrl+C（简单起见）
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                return 0
-        else:
-            print("正在打开应用窗口（非系统浏览器标签页）…")
-            _open_native_window(url)
-    except ImportError as e:
-        print("无法加载桌面窗口组件（pywebview）：", e)
-        print("将改用系统浏览器打开：", url)
-        import webbrowser
-
-        webbrowser.open(url)
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
+        return 0
+    except SystemExit as e:
+        code = e.code
+        if isinstance(code, int):
+            if code != 0:
+                print("Streamlit 异常退出，代码：", code)
+                _log_error(f"SystemExit code={code}")
+            return code
+        if code is None:
             return 0
-    except Exception as e:
-        print("打开窗口失败：", e)
-        print("请手动在浏览器访问：", url)
-        input("按回车退出...")
+        print("Streamlit 退出：", code)
+        _log_error(f"SystemExit code={code!r}")
         return 1
-
-    return 0
+    except Exception as e:
+        print("启动失败：", e)
+        traceback.print_exc()
+        _log_error(traceback.format_exc())
+        return 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # Windows 下打包 EXE 时，避免 multiprocessing spawn 子进程异常退出
+    multiprocessing.freeze_support()
+
+    try:
+        raise SystemExit(main())
+    except SystemExit as e:
+        code = e.code
+        icode = code if isinstance(code, int) else 1
+        if icode != 0:
+            _log_error(f"顶层 SystemExit code={code!r}")
+            print("\n启动失败（退出码 %s）。请查看 EXE 同目录下的 launcher_error.log" % icode)
+            input("按回车退出...")
+        raise SystemExit(icode) from None
+    except BaseException:
+        traceback.print_exc()
+        _log_error(traceback.format_exc())
+        print("\n若窗口即将关闭，请查看同目录下的 launcher_error.log")
+        input("按回车退出...")
+        raise SystemExit(1) from None
