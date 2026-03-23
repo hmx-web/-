@@ -1,0 +1,33 @@
+# 中文论文生成器 - 默认配置
+# 首次使用建议：本地 Ollama 无需 API Key；云端请修改 provider 并配置 .env
+
+model:
+  provider: ollama
+  name: qwen2.5:7b
+
+agents:
+  abstract:
+    provider: ollama
+    name: qwen2.5:7b
+  introduction:
+    provider: ollama
+    name: qwen2.5:7b
+  content:
+    provider: ollama
+    name: qwen2.5:7b
+  conclusion:
+    provider: ollama
+    name: qwen2.5:7b
+  references:
+    provider: ollama
+    name: qwen2.5:7b
+  corrector:
+    provider: ollama
+    name: qwen2.5:7b
+
+quality:
+  min_abstract: 180
+  min_introduction: 450
+  min_content: 1800
+  min_conclusion: 280
+  max_regen_rounds: 1
